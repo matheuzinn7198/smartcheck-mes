@@ -1,122 +1,115 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import LoginScreen from './components/LoginScreen';
+import Navbar from './components/Navbar';
+import DashboardOEE from './components/DashboardOEE';
+import ChecklistTab from './components/ChecklistTab';
+import KanbanOS from './components/KanbanOS';
+import NovaOSModal from './components/NovaOSModal';
+import { INITIAL_ORDENS_SERVICO } from './data/mockData';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [usuario, setUsuario] = useState(null);
+  const [abaAtiva, setAbaAtiva] = useState('dashboard');
+
+  const [ordens, setOrdens] = useState(INITIAL_ORDENS_SERVICO);
+  const [modalAberta, setModalAberta] = useState(false);
+  const [dadosOSInicial, setDadosOSInicial] = useState(null);
+
+  // Carrega a sessão do usuário caso exista no localStorage
+  useEffect(() => {
+    const sessaoSalva = localStorage.getItem('smartcheck_usuario_v1');
+    if (sessaoSalva) {
+      setUsuario(JSON.parse(sessaoSalva));
+    }
+  }, []);
+
+  const handleLogin = (dadosUsuario) => {
+    setUsuario(dadosUsuario);
+    localStorage.setItem('smartcheck_usuario_v1', JSON.stringify(dadosUsuario));
+  };
+
+  const handleLogout = () => {
+    setUsuario(null);
+    localStorage.removeItem('smartcheck_usuario_v1');
+  };
+
+  const handleAbrirOSComFalha = (dadosFalha) => {
+    setDadosOSInicial(dadosFalha);
+    setModalAberta(true);
+  };
+
+  const handleSalvarNovaOS = (novaOSDados) => {
+    const novaOS = {
+      id: `OS-2026-00${ordens.length + 1}`,
+      maquina: novaOSDados.maquina,
+      descricao: novaOSDados.descricao,
+      prioridade: novaOSDados.prioridade,
+      status: 'Aberto',
+      solicitante: usuario?.nome || 'Operador',
+      data: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setOrdens([novaOS, ...ordens]);
+    setAbaAtiva('kanban');
+  };
+
+  const handleMudarStatusOS = (id, novoStatus) => {
+    setOrdens((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: novoStatus } : o))
+    );
+  };
+
+  // Se o usuário não estiver logado, exibe a tela de login
+  if (!usuario) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans">
+      <Navbar
+        abaAtiva={abaAtiva}
+        setAbaAtiva={setAbaAtiva}
+        usuario={usuario}
+        onLogout={handleLogout}
+      />
 
-      <div className="ticks"></div>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {abaAtiva === 'dashboard' && <DashboardOEE cargo={usuario.cargo} />}
+        
+        {abaAtiva === 'checklist' && (
+           /* Operador Chefe não preenche checklist, só visualiza */
+           usuario.cargo === 'Operador Chefe do Setor' ? (
+             <div className="bg-amber-50 p-8 rounded-xl border border-amber-200 text-center text-amber-800 font-bold">
+                ⚠️ Você tem permissão apenas para acompanhar o Turno Anterior. O preenchimento do checklist diário é feito pelo Operador de Linha.
+             </div>
+           ) : (
+             <ChecklistTab onAbrirOSComFalha={handleAbrirOSComFalha} />
+           )
+        )}
+        
+        {abaAtiva === 'kanban' && (
+          <KanbanOS
+            ordens={ordens}
+            cargo={usuario.cargo} /* <- Passe o cargo se quiser bloquear arrastar cards */
+            onNovaOS={() => {
+              setDadosOSInicial(null);
+              setModalAberta(true);
+            }}
+            onMudarStatusOS={handleMudarStatusOS}
+          />
+        )}
+      </main>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <NovaOSModal
+        isOpen={modalAberta}
+        onClose={() => setModalAberta(false)}
+        onSalvarOS={handleSalvarNovaOS}
+        dadosIniciais={dadosOSInicial}
+      />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        © 2026 SmartCheck MES — AeroWheels Industrial Global
+      </footer>
+    </div>
+  );
 }
-
-export default App
